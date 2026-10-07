@@ -1,16 +1,30 @@
 import { Router } from 'express';
-import { createProjectSchema } from '@app/shared';
+import { createProjectSchema, projectQuerySchema } from '@app/shared';
 import { asyncHandler } from '../middleware/asyncHandler.js';
-import { createProject, getProjectDetail, listProjects } from '../services/projectService.js';
+import {
+  createProject,
+  deleteProject,
+  getProjectDetail,
+  listProjects,
+} from '../services/projectService.js';
 import { getRepoInsights } from '../services/repoInsightsService.js';
 
 export const projectsRouter = Router();
 
 projectsRouter.get(
   '/',
-  asyncHandler(async (_req, res) => {
-    const projects = await listProjects();
+  asyncHandler(async (req, res) => {
+    const { q } = projectQuerySchema.parse(req.query);
+    const projects = await listProjects(q);
     res.json(projects);
+  }),
+);
+
+projectsRouter.delete(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    await deleteProject(req.params.id!);
+    res.status(204).end();
   }),
 );
 

@@ -16,6 +16,11 @@ export const createProjectSchema = z.object({
 });
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
+export const projectQuerySchema = z.object({
+  q: z.string().trim().max(200).optional(),
+});
+export type ProjectQueryInput = z.infer<typeof projectQuerySchema>;
+
 export const createTicketSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(200),
   description: z.string().trim().max(5000).optional().default(''),

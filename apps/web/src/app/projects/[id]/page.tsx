@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { notFound, useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Plus } from 'lucide-react';
-import { useProject, useTickets } from '@/lib/hooks';
+import { Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useDeleteProject, useProject, useTickets } from '@/lib/hooks';
 import { ApiError } from '@/lib/apiFetch';
 import { pluralize, useDocumentTitle } from '@/lib/format';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { Button } from '@/components/Button';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState, ErrorState, ListSkeleton, Skeleton } from '@/components/States';
 import { StatusSummary } from '@/components/StatusSummary';
 import { RepoInsightsPanel } from '@/components/RepoInsightsPanel';
@@ -27,6 +29,8 @@ export default function ProjectPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const deleteProject = useDeleteProject(id);
 
   // Filters are read from the URL once, then this state is the source of truth and the URL is
   // kept in step with it — so they survive reloads and back-navigation and can be shared as a
@@ -50,8 +54,24 @@ export default function ProjectPage() {
 
   useDocumentTitle(project.data?.name);
 
-  if (project.error instanceof ApiError && project.error.status === 404) {
+  // Once it's been deleted, a 404 from a background refetch is expected: we're already leaving.
+  if (
+    !deleteProject.isSuccess &&
+    project.error instanceof ApiError &&
+    project.error.status === 404
+  ) {
     notFound();
+  }
+
+  async function handleDelete() {
+    try {
+      await deleteProject.mutateAsync();
+      toast.success('Project deleted');
+      router.push('/');
+    } catch (err) {
+      setDeleteOpen(false);
+      toast.error(err instanceof ApiError ? err.message : 'Couldn’t delete the project. Try again.');
+    }
   }
 
   if (project.isError) {
@@ -95,10 +115,21 @@ export default function ProjectPage() {
             <Skeleton className="mt-3 h-4 w-56" />
           </div>
         )}
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" aria-hidden />
-          New Ticket
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" aria-hidden />
+            New Ticket
+          </Button>
+          <Button
+            variant="ghost"
+            className="hover:text-danger"
+            disabled={!project.data}
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden />
+            Delete Project
+          </Button>
+        </div>
       </div>
 
       {project.data?.repo && (
@@ -158,6 +189,23 @@ export default function ProjectPage() {
           )}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+        loading={deleteProject.isPending || deleteProject.isSuccess}
+        title="Delete This Project?"
+        confirmLabel="Delete Project"
+      >
+        <p>
+          <strong className="font-semibold text-ink [overflow-wrap:anywhere]">
+            {project.data?.name}
+          </strong>{' '}
+          {total > 0 ? `and its ${pluralize(total, 'ticket')} ` : ''}will be permanently deleted.
+        </p>
+        <p>This can’t be undone.</p>
+      </ConfirmDialog>
 
       <CreateTicketDialog
         open={createOpen}

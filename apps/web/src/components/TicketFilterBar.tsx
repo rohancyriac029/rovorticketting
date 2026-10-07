@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { useState } from 'react';
+import { X } from 'lucide-react';
 import {
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
@@ -9,6 +9,7 @@ import {
   TICKET_STATUS_LABELS,
 } from '@app/shared';
 import { EMPTY_FILTERS, hasActiveFilters, type FilterState } from '@/lib/ticketFilters';
+import { SearchField } from './SearchField';
 
 function toggle(list: string[], item: string) {
   return list.includes(item) ? list.filter((i) => i !== item) : [...list, item];
@@ -25,56 +26,24 @@ export function TicketFilterBar({
    */
   onChange: (update: (prev: FilterState) => FilterState) => void;
 }) {
-  // The box updates on every keystroke; the filter itself only after typing pauses.
-  const [q, setQ] = useState(value.q);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
-  const emittedQ = useRef(value.q);
-
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  // The search term was changed from outside (e.g. the empty state's Clear Filters): follow it.
-  useEffect(() => {
-    if (value.q !== emittedQ.current) {
-      clearTimeout(timer.current);
-      emittedQ.current = value.q;
-      setQ(value.q);
-    }
-  }, [value.q]);
-
-  function handleSearch(next: string) {
-    setQ(next);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      emittedQ.current = next;
-      onChange((prev) => ({ ...prev, q: next }));
-    }, 300);
-  }
+  // Bumped by Clear Filters to remount the search box, dropping any term still waiting to apply.
+  const [resetCount, setResetCount] = useState(0);
 
   function clearAll() {
-    clearTimeout(timer.current);
-    emittedQ.current = '';
-    setQ('');
+    setResetCount((c) => c + 1);
     onChange(() => EMPTY_FILTERS);
   }
 
   return (
     <div className="card flex flex-col gap-4 p-4 lg:flex-row lg:items-center">
-      <div className="relative lg:w-72 lg:shrink-0">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
-          aria-hidden
-        />
-        <input
-          type="search"
-          name="q"
-          value={q}
-          onChange={(e) => handleSearch(e.target.value)}
-          aria-label="Search tickets by title or description"
-          placeholder="Search tickets…"
-          autoComplete="off"
-          className="input pl-9 [&::-webkit-search-cancel-button]:appearance-none"
-        />
-      </div>
+      <SearchField
+        key={resetCount}
+        value={value.q}
+        onChange={(q) => onChange((prev) => ({ ...prev, q }))}
+        label="Search tickets by title or description"
+        placeholder="Search tickets…"
+        className="lg:w-72 lg:shrink-0"
+      />
 
       <div className="flex flex-1 flex-wrap items-center gap-x-5 gap-y-3">
         <ChipGroup
@@ -91,7 +60,7 @@ export function TicketFilterBar({
           selected={value.priority}
           onToggle={(p) => onChange((prev) => ({ ...prev, priority: toggle(prev.priority, p) }))}
         />
-        {(hasActiveFilters(value) || q) && (
+        {hasActiveFilters(value) && (
           <button
             type="button"
             onClick={clearAll}

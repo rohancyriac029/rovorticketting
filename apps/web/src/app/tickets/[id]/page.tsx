@@ -1,18 +1,20 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { notFound, useParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { updateTicketSchema } from '@app/shared';
-import { useTicket, useUpdateTicket } from '@/lib/hooks';
+import { useDeleteTicket, useTicket, useUpdateTicket } from '@/lib/hooks';
 import { ApiError } from '@/lib/apiFetch';
 import { formatDateTime, relativeTime, useDocumentTitle } from '@/lib/format';
 import { submitOnModEnter } from '@/lib/forms';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { Button } from '@/components/Button';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { StatusBadge } from '@/components/Badges';
 import { ErrorState, Skeleton } from '@/components/States';
 import { TicketFields, type TicketFormValues } from '@/components/TicketFields';
@@ -22,6 +24,8 @@ export default function TicketPage() {
   const router = useRouter();
   const { data: ticket, isError, error, refetch } = useTicket(id);
   const updateTicket = useUpdateTicket(id, ticket?.projectId ?? '');
+  const deleteTicket = useDeleteTicket(id, ticket?.projectId ?? '');
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const {
     register,
@@ -51,7 +55,8 @@ export default function TicketPage() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [isDirty]);
 
-  if (error instanceof ApiError && error.status === 404) {
+  // Once it's been deleted, a 404 from a background refetch is expected: we're already leaving.
+  if (!deleteTicket.isSuccess && error instanceof ApiError && error.status === 404) {
     notFound();
   }
 
@@ -93,6 +98,17 @@ export default function TicketPage() {
       router.push(projectHref);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Couldn’t save the ticket. Try again.');
+    }
+  }
+
+  async function handleDelete() {
+    try {
+      await deleteTicket.mutateAsync();
+      toast.success('Ticket deleted');
+      router.push(projectHref);
+    } catch (err) {
+      setDeleteOpen(false);
+      toast.error(err instanceof ApiError ? err.message : 'Couldn’t delete the ticket. Try again.');
     }
   }
 
@@ -140,7 +156,15 @@ export default function TicketPage() {
         </dl>
 
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-          {!isDirty && <p className="text-xs text-muted sm:mr-auto">No unsaved changes.</p>}
+          <Button
+            variant="ghost"
+            className="hover:text-danger sm:-ml-3 sm:mr-auto"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden />
+            Delete
+          </Button>
+          {!isDirty && <p className="text-xs text-muted">No unsaved changes.</p>}
           <Link href={projectHref} className="btn btn-ghost">
             Cancel
           </Link>
@@ -149,6 +173,21 @@ export default function TicketPage() {
           </Button>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+        loading={deleteTicket.isPending || deleteTicket.isSuccess}
+        title="Delete This Ticket?"
+        confirmLabel="Delete Ticket"
+      >
+        <p>
+          <strong className="font-semibold text-ink [overflow-wrap:anywhere]">{ticket.title}</strong>{' '}
+          will be permanently deleted from {ticket.project.name}.
+        </p>
+        <p>This can’t be undone.</p>
+      </ConfirmDialog>
     </div>
   );
 }

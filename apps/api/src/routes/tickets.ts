@@ -1,7 +1,13 @@
 import { Router } from 'express';
 import { createTicketSchema, ticketQuerySchema, updateTicketSchema } from '@app/shared';
 import { asyncHandler } from '../middleware/asyncHandler.js';
-import { createTicket, getTicket, listTickets, updateTicket } from '../services/ticketService.js';
+import {
+  createTicket,
+  deleteTicket,
+  getTicket,
+  listTickets,
+  updateTicket,
+} from '../services/ticketService.js';
 
 export const projectTicketsRouter = Router();
 
@@ -30,6 +36,14 @@ ticketsRouter.get(
   asyncHandler(async (req, res) => {
     const ticket = await getTicket(req.params.id!);
     res.json(ticket);
+  }),
+);
+
+ticketsRouter.delete(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    await deleteTicket(req.params.id!);
+    res.status(204).end();
   }),
 );
 

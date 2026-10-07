@@ -93,6 +93,13 @@ The brief lists notifications as out of scope; this was added afterwards as an e
 - **Disabled automatically** when `SMTP_*` / `MAIL_FROM` / `ADMIN_EMAIL` aren't set (e.g. local dev).
 - Limitations: no retry queue — an email is lost if SMTP is down or the process restarts mid-send (the next step would be an outbox table + worker). SES is in sandbox mode, so it can only send to verified addresses, and mail sent "from" a gmail.com address via SES may land in spam.
 
+## 6b. Project search & delete (extras, beyond the brief)
+
+- **Project search:** the dashboard has a search box backed by `GET /api/projects?q=` — a case-insensitive match on name or description, run in Postgres like ticket search, so it keeps working as the number of projects grows. The term lives in the URL (`/?q=`), is debounced 300ms, and the previous results stay on screen (dimmed) while the next ones load.
+- **Delete:** `DELETE /api/projects/:id` and `DELETE /api/tickets/:id` return `204`, or `404` if the record is already gone. Deleting a project removes its tickets through the database's `ON DELETE CASCADE`. In the UI both sit behind a confirmation dialog that names what will be removed and focuses **Cancel** by default; they are low-emphasis buttons on the project and ticket pages so they don't compete with the main actions.
+- After a delete the affected lists are invalidated as with any other mutation, and the deleted record's cached data is purged once its page has closed, so Back shows "not found" rather than a stale copy.
+- Limitations: deletes are permanent (no soft delete or undo), and because there is no authentication (per the brief) anyone with the link can delete data.
+
 ## 7. Deployment
 
 See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the full AWS + Vercel walkthrough. Summary: the API runs in Docker on a single EC2 instance behind Caddy (automatic HTTPS via Let's Encrypt); the frontend is a standard Vercel deployment pointed at the API's public URL via `NEXT_PUBLIC_API_URL`.

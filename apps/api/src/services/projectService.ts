@@ -4,7 +4,8 @@ import { AppError } from '../lib/errors.js';
 import {
   countTicketsByProjectAndStatus,
   createProject as createProjectRow,
-  findAllProjects,
+  deleteProjectById,
+  findProjects,
   findProjectById,
   findRecentTicketsForProjects,
 } from '../repositories/projectRepository.js';
@@ -15,13 +16,13 @@ import type { ProjectDetailDTO, ProjectListItemDTO } from '@app/shared';
 
 const RECENT_TICKETS_LIMIT = 3;
 
-export async function listProjects(): Promise<ProjectListItemDTO[]> {
-  const projects = await findAllProjects();
-  const grouped = await countTicketsByProjectAndStatus();
-  const recentLists = await findRecentTicketsForProjects(
-    projects.map((p) => p.id),
-    RECENT_TICKETS_LIMIT,
-  );
+export async function listProjects(q?: string): Promise<ProjectListItemDTO[]> {
+  const projects = await findProjects(q);
+  const ids = projects.map((p) => p.id);
+  const [grouped, recentLists] = await Promise.all([
+    countTicketsByProjectAndStatus(ids),
+    findRecentTicketsForProjects(ids, RECENT_TICKETS_LIMIT),
+  ]);
 
   return projects.map((project, i) => ({
     ...toProjectDTO(project),
@@ -39,6 +40,11 @@ export async function getProjectDetail(id: string): Promise<ProjectDetailDTO> {
     ...toProjectDTO(project),
     counts: toTicketCounts(grouped.map((g) => ({ ...g, projectId: id }))),
   };
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  const deleted = await deleteProjectById(id);
+  if (deleted === 0) throw AppError.notFound('Project not found');
 }
 
 export async function createProject(input: CreateProjectInput) {

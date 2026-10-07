@@ -3,6 +3,7 @@ import { AppError } from '../lib/errors.js';
 import { findProjectById } from '../repositories/projectRepository.js';
 import {
   createTicket as createTicketRow,
+  deleteTicketById,
   findTicketById,
   findTickets,
   updateTicket as updateTicketRow,
@@ -47,6 +48,11 @@ export async function createTicket(projectId: string, input: CreateTicketInput) 
   const dto = toTicketDTO(ticket);
   ticketNotifier.ticketCreated(dto, project.name);
   return dto;
+}
+
+export async function deleteTicket(id: string): Promise<void> {
+  const deleted = await deleteTicketById(id);
+  if (deleted === 0) throw AppError.notFound('Ticket not found');
 }
 
 export async function updateTicket(id: string, input: UpdateTicketInput) {

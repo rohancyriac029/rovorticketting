@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateProjectInput,
@@ -11,10 +12,13 @@ import type {
 import { apiFetch } from './apiFetch';
 import { queryKeys } from './queryKeys';
 
-export function useProjects() {
+export function useProjects(q = '') {
   return useQuery({
-    queryKey: queryKeys.projects,
-    queryFn: () => apiFetch<ProjectListItemDTO[]>('/api/projects'),
+    queryKey: queryKeys.projectList(q),
+    queryFn: () =>
+      apiFetch<ProjectListItemDTO[]>(`/api/projects${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    // Keep the previous results on screen while a new search loads, instead of flashing skeletons.
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -115,6 +119,56 @@ export function useUpdateTicket(ticketId: string, projectId: string) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ticket(ticketId) });
+      invalidateTicketRelated(queryClient, projectId);
+    },
+  });
+}
+
+/**
+ * Runs `purge` when the component unmounts, but only after `deleted.current` was set. Cached data
+ * for a deleted record has to go, or Back would show it again — but removing it while its page is
+ * still mounted would make that page refetch and flash an error on the way out.
+ */
+function usePurgeAfterDelete(purge: () => void) {
+  const deleted = useRef(false);
+  const purgeRef = useRef(purge);
+  useEffect(() => {
+    purgeRef.current = purge;
+  });
+  useEffect(
+    () => () => {
+      if (deleted.current) purgeRef.current();
+    },
+    [],
+  );
+  return deleted;
+}
+
+export function useDeleteProject(projectId: string) {
+  const queryClient = useQueryClient();
+  const deleted = usePurgeAfterDelete(() => {
+    queryClient.removeQueries({ queryKey: queryKeys.project(projectId) });
+    queryClient.removeQueries({ queryKey: ['tickets', projectId] });
+    queryClient.removeQueries({ queryKey: queryKeys.repoInsights(projectId) });
+  });
+  return useMutation({
+    mutationFn: () => apiFetch<void>(`/api/projects/${projectId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      deleted.current = true;
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+    },
+  });
+}
+
+export function useDeleteTicket(ticketId: string, projectId: string) {
+  const queryClient = useQueryClient();
+  const deleted = usePurgeAfterDelete(() => {
+    queryClient.removeQueries({ queryKey: queryKeys.ticket(ticketId) });
+  });
+  return useMutation({
+    mutationFn: () => apiFetch<void>(`/api/tickets/${ticketId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      deleted.current = true;
       invalidateTicketRelated(queryClient, projectId);
     },
   });

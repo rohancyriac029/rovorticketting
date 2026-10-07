@@ -20,7 +20,12 @@ const config: Config = {
           soft: 'var(--accent-soft)',
           text: 'var(--accent-text)',
         },
-        danger: { DEFAULT: 'var(--danger)', soft: 'var(--danger-soft)' },
+        danger: {
+          DEFAULT: 'var(--danger)',
+          hover: 'var(--danger-hover)',
+          ink: 'var(--danger-ink)',
+          soft: 'var(--danger-soft)',
+        },
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'sans-serif'],
