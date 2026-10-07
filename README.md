@@ -4,8 +4,8 @@ A small project and ticket management app. TypeScript throughout — Next.js fro
 
 ## 1. Overview & live links
 
-- **Frontend (Vercel):** TODO
-- **API (AWS EC2):** TODO
+- **Frontend (Vercel):** https://rovorticketting.vercel.app
+- **API (AWS EC2):** https://13-202-9-144.sslip.io (health: `/health`, e.g. `/api/projects`)
 
 ## 2. Local setup
 
