@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import {
   TICKET_PRIORITIES,
@@ -15,6 +15,16 @@ export interface FilterState {
   priority: string[];
 }
 
+export const EMPTY_FILTERS: FilterState = { q: '', status: [], priority: [] };
+
+export function hasActiveFilters(f: FilterState) {
+  return Boolean(f.q || f.status.length || f.priority.length);
+}
+
+function toggle(list: string[], item: string) {
+  return list.includes(item) ? list.filter((i) => i !== item) : [...list, item];
+}
+
 export function TicketFilterBar({
   value,
   onChange,
@@ -24,74 +34,104 @@ export function TicketFilterBar({
 }) {
   const [q, setQ] = useState(value.q);
 
+  // Keep the box in sync when the URL changes underneath it (back/forward, Clear Filters).
   useEffect(() => setQ(value.q), [value.q]);
 
+  // The debounce below fires up to 300ms after a keystroke. Reading filters through a ref means it
+  // merges into the filters as they are *then*, so it can't resurrect ones cleared in the meantime.
+  const latest = useRef({ value, onChange });
+  useEffect(() => {
+    latest.current = { value, onChange };
+  });
+
+  // Debounce so each keystroke doesn't hit the API or rewrite the URL.
   useEffect(() => {
     const handle = setTimeout(() => {
-      if (q !== value.q) onChange({ ...value, q });
+      const { value: current, onChange: change } = latest.current;
+      if (q !== current.q) change({ ...current, q });
     }, 300);
     return () => clearTimeout(handle);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  function toggle(list: string[], item: string) {
-    return list.includes(item) ? list.filter((i) => i !== item) : [...list, item];
-  }
-
-  const hasFilters = value.q || value.status.length > 0 || value.priority.length > 0;
-
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="relative flex-1">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+    <div className="card flex flex-col gap-4 p-4 lg:flex-row lg:items-center">
+      <div className="relative lg:w-72 lg:shrink-0">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
+          aria-hidden
+        />
         <input
+          type="search"
+          name="q"
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          aria-label="Search tickets by title or description"
           placeholder="Search tickets…"
-          className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] py-2 pl-9 pr-3 text-sm text-[var(--text)] outline-none focus:ring-2 focus:ring-ochre-400"
+          autoComplete="off"
+          className="input pl-9 [&::-webkit-search-cancel-button]:appearance-none"
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {TICKET_STATUSES.map((s) => (
+      <div className="flex flex-1 flex-wrap items-center gap-x-5 gap-y-3">
+        <ChipGroup
+          label="Status"
+          options={TICKET_STATUSES}
+          labels={TICKET_STATUS_LABELS}
+          selected={value.status}
+          onToggle={(s) => onChange({ ...value, status: toggle(value.status, s) })}
+        />
+        <ChipGroup
+          label="Priority"
+          options={TICKET_PRIORITIES}
+          labels={TICKET_PRIORITY_LABELS}
+          selected={value.priority}
+          onToggle={(p) => onChange({ ...value, priority: toggle(value.priority, p) })}
+        />
+        {hasActiveFilters(value) && (
           <button
-            key={s}
-            onClick={() => onChange({ ...value, status: toggle(value.status, s) })}
-            className={`badge border ${
-              value.status.includes(s)
-                ? 'border-ochre-500 bg-ochre-500 text-white'
-                : 'border-[var(--border)] bg-transparent text-[var(--text-muted)]'
-            }`}
-          >
-            {TICKET_STATUS_LABELS[s]}
-          </button>
-        ))}
-        <span className="mx-1 h-4 w-px bg-[var(--border)]" />
-        {TICKET_PRIORITIES.map((p) => (
-          <button
-            key={p}
-            onClick={() => onChange({ ...value, priority: toggle(value.priority, p) })}
-            className={`badge border ${
-              value.priority.includes(p)
-                ? 'border-ochre-500 bg-ochre-500 text-white'
-                : 'border-[var(--border)] bg-transparent text-[var(--text-muted)]'
-            }`}
-          >
-            {TICKET_PRIORITY_LABELS[p]}
-          </button>
-        ))}
-        {hasFilters && (
-          <button
+            type="button"
             onClick={() => {
               setQ('');
-              onChange({ q: '', status: [], priority: [] });
+              onChange(EMPTY_FILTERS);
             }}
-            className="ml-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--text-muted)] hover:text-rose-600"
+            className="ml-auto inline-flex h-9 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-muted transition-colors hover:text-ink sm:h-8"
           >
-            <X className="h-3.5 w-3.5" /> Clear filters
+            <X className="h-3.5 w-3.5" aria-hidden />
+            Clear Filters
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+function ChipGroup<T extends string>({
+  label,
+  options,
+  labels,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  options: readonly T[];
+  labels: Record<T, string>;
+  selected: string[];
+  onToggle: (option: T) => void;
+}) {
+  return (
+    <div role="group" aria-label={`Filter by ${label.toLowerCase()}`} className="flex items-center gap-1.5">
+      <span className="mr-0.5 text-xs font-medium text-muted">{label}</span>
+      {options.map((option) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={selected.includes(option)}
+          onClick={() => onToggle(option)}
+          className="chip"
+        >
+          {labels[option]}
+        </button>
+      ))}
     </div>
   );
 }

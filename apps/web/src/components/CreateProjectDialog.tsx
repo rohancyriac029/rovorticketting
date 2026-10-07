@@ -5,8 +5,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { createProjectSchema, type CreateProjectInput } from '@app/shared';
 import { toast } from 'sonner';
 import { Dialog } from './Dialog';
+import { Button } from './Button';
+import { Field, fieldAria } from './Field';
 import { useCreateProject } from '@/lib/hooks';
 import { ApiError } from '@/lib/apiFetch';
+import { submitOnModEnter } from '@/lib/forms';
 
 export function CreateProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const createProject = useCreateProject();
@@ -21,80 +24,81 @@ export function CreateProjectDialog({ open, onClose }: { open: boolean; onClose:
     defaultValues: { name: '', description: '', repo: '' },
   });
 
+  function close() {
+    reset();
+    onClose();
+  }
+
   async function onSubmit(data: CreateProjectInput) {
     try {
       await createProject.mutateAsync({ ...data, repo: data.repo || undefined });
       toast.success('Project created');
-      reset();
-      onClose();
+      close();
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.code === 'REPO_NOT_FOUND') {
-          setError('repo', { message: err.message });
-        } else {
-          toast.error(err.message);
-        }
+      if (err instanceof ApiError && err.code === 'REPO_NOT_FOUND') {
+        setError('repo', { message: err.message }, { shouldFocus: true });
       } else {
-        toast.error('Something went wrong');
+        toast.error(
+          err instanceof ApiError ? err.message : 'Couldn’t create the project. Try again.',
+        );
       }
     }
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="New project">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div>
-          <label htmlFor="name" className="mb-1 block text-sm font-medium text-[var(--text)]">
-            Name
-          </label>
+    <Dialog
+      open={open}
+      onClose={close}
+      title="New Project"
+      description="Group related tickets and optionally link a public GitHub repository."
+    >
+      <form onSubmit={handleSubmit(onSubmit)} onKeyDown={submitOnModEnter} className="space-y-4">
+        <Field label="Name" htmlFor="project-name" error={errors.name?.message}>
           <input
-            id="name"
             {...register('name')}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:ring-2 focus:ring-ochre-400"
+            {...fieldAria('project-name', errors.name?.message)}
+            autoComplete="off"
+            placeholder="Payments API…"
+            className="input"
           />
-          {errors.name && <p className="mt-1 text-xs text-rose-600">{errors.name.message}</p>}
-        </div>
-        <div>
-          <label
-            htmlFor="description"
-            className="mb-1 block text-sm font-medium text-[var(--text)]"
-          >
-            Description
-          </label>
+        </Field>
+        <Field
+          label="Description"
+          htmlFor="project-description"
+          optional
+          error={errors.description?.message}
+        >
           <textarea
-            id="description"
             {...register('description')}
+            {...fieldAria('project-description', errors.description?.message)}
             rows={3}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:ring-2 focus:ring-ochre-400"
+            placeholder="What is this project for…"
+            className="input resize-y"
           />
-        </div>
-        <div>
-          <label htmlFor="repo" className="mb-1 block text-sm font-medium text-[var(--text)]">
-            GitHub repo (optional)
-          </label>
+        </Field>
+        <Field
+          label="GitHub Repository"
+          htmlFor="project-repo"
+          optional
+          error={errors.repo?.message}
+          hint="Adds stars, forks, open issues & release info to the project."
+        >
           <input
-            id="repo"
-            placeholder="owner/repo or https://github.com/owner/repo"
             {...register('repo')}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:ring-2 focus:ring-ochre-400"
+            {...fieldAria('project-repo', errors.repo?.message)}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="owner/repo or https://github.com/owner/repo…"
+            className="input"
           />
-          {errors.repo && <p className="mt-1 text-xs text-rose-600">{errors.repo.message}</p>}
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full px-4 py-2 text-sm font-medium text-[var(--text-muted)] hover:bg-ochre-100 dark:hover:bg-ink-700"
-          >
+        </Field>
+        <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+          <Button variant="ghost" onClick={close}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="rounded-full bg-ochre-500 px-5 py-2 text-sm font-semibold text-white hover:bg-ochre-600 disabled:opacity-50"
-          >
-            {isSubmitting ? 'Creating…' : 'Create project'}
-          </button>
+          </Button>
+          <Button type="submit" loading={isSubmitting}>
+            Create Project
+          </Button>
         </div>
       </form>
     </Dialog>

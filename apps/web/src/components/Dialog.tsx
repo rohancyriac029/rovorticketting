@@ -1,64 +1,64 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 
+/**
+ * Built on the native <dialog>: showModal() gives a real focus trap, Escape-to-close,
+ * an inert background and focus restoration without hand-rolled key handling.
+ */
 export function Dialog({
   open,
   onClose,
   title,
+  description,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
+  description?: string;
   children: React.ReactNode;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
-    if (!open) return;
-    const prevActive = document.activeElement as HTMLElement | null;
-    ref.current?.querySelector<HTMLElement>('input, textarea, select, button')?.focus();
-
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      prevActive?.focus();
-    };
-  }, [open, onClose]);
-
-  if (!open) return null;
+    const el = ref.current;
+    if (!el) return;
+    if (open && !el.open) el.showModal();
+    if (!open && el.open) el.close();
+  }, [open]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
+    <dialog
+      ref={ref}
+      aria-labelledby={titleId}
+      onClose={onClose}
+      // The dialog has no padding, so a click that lands on it directly is a backdrop click.
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === ref.current) onClose();
       }}
+      className="m-auto w-[calc(100%-2rem)] max-w-lg overscroll-contain rounded-2xl border border-line bg-surface p-0 text-ink shadow-pop"
     >
-      <div
-        ref={ref}
-        className="w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xl"
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[var(--text)]">{title}</h2>
+      {open && (
+        <div className="relative p-5 sm:p-6">
+          <h2 id={titleId} className="pr-10 font-display text-xl font-semibold tracking-tight">
+            {title}
+          </h2>
+          {description && <p className="mt-1 text-sm text-muted">{description}</p>}
+          <div className="mt-5">{children}</div>
+          {/* Last in DOM order so showModal() focuses the first form field, not this button. */}
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="rounded-full p-1 text-[var(--text-muted)] hover:bg-ochre-100 dark:hover:bg-ink-700"
+            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-sunken hover:text-ink"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" aria-hidden />
           </button>
         </div>
-        {children}
-      </div>
-    </div>
+      )}
+    </dialog>
   );
 }

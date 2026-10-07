@@ -1,24 +1,48 @@
+import { ChevronsUp, Equal, ChevronDown } from 'lucide-react';
 import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS } from '@app/shared';
 import type { TicketPriority, TicketStatus } from '@app/shared';
 
-const STATUS_STYLES: Record<TicketStatus, string> = {
-  TODO: 'bg-ink-100 text-ink-600 dark:bg-ink-700 dark:text-ink-100',
-  IN_PROGRESS: 'bg-ochre-100 text-ochre-700 dark:bg-ochre-900 dark:text-ochre-200',
-  DONE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200',
+export const STATUS_TONE: Record<TicketStatus, string> = {
+  TODO: 'tone-neutral',
+  IN_PROGRESS: 'tone-ochre',
+  DONE: 'tone-green',
 };
 
-const PRIORITY_STYLES: Record<TicketPriority, string> = {
-  LOW: 'bg-ink-100 text-ink-500 dark:bg-ink-700 dark:text-ink-200',
-  MEDIUM: 'bg-ochre-100 text-ochre-700 dark:bg-ochre-900 dark:text-ochre-200',
-  HIGH: 'bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-200',
+const PRIORITY_TONE: Record<TicketPriority, string> = {
+  LOW: 'tone-neutral',
+  MEDIUM: 'tone-ochre',
+  HIGH: 'tone-red',
 };
+
+const PRIORITY_ICON = { LOW: ChevronDown, MEDIUM: Equal, HIGH: ChevronsUp } as const;
 
 export function StatusBadge({ status }: { status: TicketStatus }) {
-  return <span className={`badge ${STATUS_STYLES[status]}`}>{TICKET_STATUS_LABELS[status]}</span>;
+  return (
+    <span className={`badge ${STATUS_TONE[status]}`}>
+      <span className="dot" aria-hidden />
+      {TICKET_STATUS_LABELS[status]}
+    </span>
+  );
 }
 
-export function PriorityBadge({ priority }: { priority: TicketPriority }) {
+export function StatusDot({ status }: { status: TicketStatus }) {
   return (
-    <span className={`badge ${PRIORITY_STYLES[priority]}`}>{TICKET_PRIORITY_LABELS[priority]}</span>
+    <span className={STATUS_TONE[status]}>
+      <span className="dot" aria-hidden />
+      <span className="sr-only">{TICKET_STATUS_LABELS[status]}:</span>
+    </span>
+  );
+}
+
+/** Icon + label rather than a second pill, so priority reads differently from status at a glance. */
+export function PriorityLabel({ priority }: { priority: TicketPriority }) {
+  const Icon = PRIORITY_ICON[priority];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 whitespace-nowrap text-[13px] font-medium ${PRIORITY_TONE[priority]}`}
+    >
+      <Icon className="h-4 w-4 text-[var(--tone-dot)]" aria-hidden />
+      <span className="text-[var(--tone-fg)]">{TICKET_PRIORITY_LABELS[priority]}</span>
+    </span>
   );
 }
