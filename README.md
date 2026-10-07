@@ -83,6 +83,16 @@ The UI shows "Updated X ago · cached/live" so the caching is visible, not just 
 
 Note: GitHub's `open_issues_count` includes open pull requests, not just issues — called out in the UI copy's intent, not hidden.
 
+## 6a. Ticket email notifications (extra, beyond the brief)
+
+The brief lists notifications as out of scope; this was added afterwards as an explicit extra. When a ticket is created, the API emails `ADMIN_EMAIL` with the project, title, status, priority, description, and a link to the ticket.
+
+- Lives in `apps/api/src/notifications/`, called from `ticketService.createTicket` — routes and repositories are unaware of it.
+- Sent over plain SMTP via Nodemailer, so any provider works. Production uses **Amazon SES** (`email-smtp.ap-south-1.amazonaws.com`) with an IAM user that may only `ses:SendRawEmail` from the one verified address.
+- **Fire-and-forget:** the HTTP response never waits on SMTP, and a mail failure is logged instead of failing ticket creation.
+- **Disabled automatically** when `SMTP_*` / `MAIL_FROM` / `ADMIN_EMAIL` aren't set (e.g. local dev).
+- Limitations: no retry queue — an email is lost if SMTP is down or the process restarts mid-send (the next step would be an outbox table + worker). SES is in sandbox mode, so it can only send to verified addresses, and mail sent "from" a gmail.com address via SES may land in spam.
+
 ## 7. Deployment
 
 See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the full AWS + Vercel walkthrough. Summary: the API runs in Docker on a single EC2 instance behind Caddy (automatic HTTPS via Let's Encrypt); the frontend is a standard Vercel deployment pointed at the API's public URL via `NEXT_PUBLIC_API_URL`.

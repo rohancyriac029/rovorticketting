@@ -8,6 +8,7 @@ import {
   updateTicket as updateTicketRow,
 } from '../repositories/ticketRepository.js';
 import { toTicketDTO } from './mappers.js';
+import { ticketNotifier } from '../notifications/ticketNotifier.js';
 
 export async function listTickets(projectId: string, query: TicketQueryInput) {
   const project = await findProjectById(projectId);
@@ -43,7 +44,9 @@ export async function createTicket(projectId: string, input: CreateTicketInput) 
     priority: input.priority ?? 'MEDIUM',
     project: { connect: { id: projectId } },
   });
-  return toTicketDTO(ticket);
+  const dto = toTicketDTO(ticket);
+  ticketNotifier.ticketCreated(dto, project.name);
+  return dto;
 }
 
 export async function updateTicket(id: string, input: UpdateTicketInput) {
