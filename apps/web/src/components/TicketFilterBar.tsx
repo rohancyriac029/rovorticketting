@@ -8,18 +8,7 @@ import {
   TICKET_STATUSES,
   TICKET_STATUS_LABELS,
 } from '@app/shared';
-
-export interface FilterState {
-  q: string;
-  status: string[];
-  priority: string[];
-}
-
-export const EMPTY_FILTERS: FilterState = { q: '', status: [], priority: [] };
-
-export function hasActiveFilters(f: FilterState) {
-  return Boolean(f.q || f.status.length || f.priority.length);
-}
+import { EMPTY_FILTERS, hasActiveFilters, type FilterState } from '@/lib/ticketFilters';
 
 function toggle(list: string[], item: string) {
   return list.includes(item) ? list.filter((i) => i !== item) : [...list, item];
@@ -30,28 +19,43 @@ export function TicketFilterBar({
   onChange,
 }: {
   value: FilterState;
-  onChange: (next: FilterState) => void;
+  /**
+   * Takes an updater, not a value: every change is applied to the filters as they are at that
+   * moment, so a delayed search update can't overwrite a chip toggled (or a clear) in between.
+   */
+  onChange: (update: (prev: FilterState) => FilterState) => void;
 }) {
+  // The box updates on every keystroke; the filter itself only after typing pauses.
   const [q, setQ] = useState(value.q);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const emittedQ = useRef(value.q);
 
-  // Keep the box in sync when the URL changes underneath it (back/forward, Clear Filters).
-  useEffect(() => setQ(value.q), [value.q]);
+  useEffect(() => () => clearTimeout(timer.current), []);
 
-  // The debounce below fires up to 300ms after a keystroke. Reading filters through a ref means it
-  // merges into the filters as they are *then*, so it can't resurrect ones cleared in the meantime.
-  const latest = useRef({ value, onChange });
+  // The search term was changed from outside (e.g. the empty state's Clear Filters): follow it.
   useEffect(() => {
-    latest.current = { value, onChange };
-  });
+    if (value.q !== emittedQ.current) {
+      clearTimeout(timer.current);
+      emittedQ.current = value.q;
+      setQ(value.q);
+    }
+  }, [value.q]);
 
-  // Debounce so each keystroke doesn't hit the API or rewrite the URL.
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      const { value: current, onChange: change } = latest.current;
-      if (q !== current.q) change({ ...current, q });
+  function handleSearch(next: string) {
+    setQ(next);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      emittedQ.current = next;
+      onChange((prev) => ({ ...prev, q: next }));
     }, 300);
-    return () => clearTimeout(handle);
-  }, [q]);
+  }
+
+  function clearAll() {
+    clearTimeout(timer.current);
+    emittedQ.current = '';
+    setQ('');
+    onChange(() => EMPTY_FILTERS);
+  }
 
   return (
     <div className="card flex flex-col gap-4 p-4 lg:flex-row lg:items-center">
@@ -64,7 +68,7 @@ export function TicketFilterBar({
           type="search"
           name="q"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => handleSearch(e.target.value)}
           aria-label="Search tickets by title or description"
           placeholder="Search tickets…"
           autoComplete="off"
@@ -78,22 +82,19 @@ export function TicketFilterBar({
           options={TICKET_STATUSES}
           labels={TICKET_STATUS_LABELS}
           selected={value.status}
-          onToggle={(s) => onChange({ ...value, status: toggle(value.status, s) })}
+          onToggle={(s) => onChange((prev) => ({ ...prev, status: toggle(prev.status, s) }))}
         />
         <ChipGroup
           label="Priority"
           options={TICKET_PRIORITIES}
           labels={TICKET_PRIORITY_LABELS}
           selected={value.priority}
-          onToggle={(p) => onChange({ ...value, priority: toggle(value.priority, p) })}
+          onToggle={(p) => onChange((prev) => ({ ...prev, priority: toggle(prev.priority, p) }))}
         />
-        {hasActiveFilters(value) && (
+        {(hasActiveFilters(value) || q) && (
           <button
             type="button"
-            onClick={() => {
-              setQ('');
-              onChange(EMPTY_FILTERS);
-            }}
+            onClick={clearAll}
             className="ml-auto inline-flex h-9 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-muted transition-colors hover:text-ink sm:h-8"
           >
             <X className="h-3.5 w-3.5" aria-hidden />
@@ -119,7 +120,11 @@ function ChipGroup<T extends string>({
   onToggle: (option: T) => void;
 }) {
   return (
-    <div role="group" aria-label={`Filter by ${label.toLowerCase()}`} className="flex items-center gap-1.5">
+    <div
+      role="group"
+      aria-label={`Filter by ${label.toLowerCase()}`}
+      className="flex items-center gap-1.5"
+    >
       <span className="mr-0.5 text-xs font-medium text-muted">{label}</span>
       {options.map((option) => (
         <button

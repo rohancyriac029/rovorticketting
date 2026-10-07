@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { notFound, useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { useProject, useTickets } from '@/lib/hooks';
@@ -11,12 +11,14 @@ import { Button } from '@/components/Button';
 import { EmptyState, ErrorState, ListSkeleton, Skeleton } from '@/components/States';
 import { StatusSummary } from '@/components/StatusSummary';
 import { RepoInsightsPanel } from '@/components/RepoInsightsPanel';
+import { TicketFilterBar } from '@/components/TicketFilterBar';
 import {
   EMPTY_FILTERS,
-  TicketFilterBar,
   hasActiveFilters,
+  parseFilters,
+  serializeFilters,
   type FilterState,
-} from '@/components/TicketFilterBar';
+} from '@/lib/ticketFilters';
 import { TicketList } from '@/components/TicketList';
 import { CreateTicketDialog } from '@/components/CreateTicketDialog';
 
@@ -26,24 +28,18 @@ export default function ProjectPage() {
   const searchParams = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
 
-  // Filters live in the URL so they survive back-navigation and can be shared as a link.
-  const filters: FilterState = useMemo(
-    () => ({
-      q: searchParams.get('q') ?? '',
-      status: searchParams.get('status')?.split(',').filter(Boolean) ?? [],
-      priority: searchParams.get('priority')?.split(',').filter(Boolean) ?? [],
-    }),
-    [searchParams],
-  );
+  // Filters are read from the URL once, then this state is the source of truth and the URL is
+  // kept in step with it — so they survive reloads and back-navigation and can be shared as a
+  // link. Syncing one way only means a slow URL update can never feed stale filters back in.
+  const [filters, setFilters] = useState<FilterState>(() => parseFilters(searchParams));
+  const query = serializeFilters(filters);
+  const writtenQuery = useRef(query);
 
-  function updateFilters(next: FilterState) {
-    const params = new URLSearchParams();
-    if (next.q) params.set('q', next.q);
-    if (next.status.length) params.set('status', next.status.join(','));
-    if (next.priority.length) params.set('priority', next.priority.join(','));
-    const qs = params.toString();
-    router.replace(`/projects/${id}${qs ? `?${qs}` : ''}`, { scroll: false });
-  }
+  useEffect(() => {
+    if (query === writtenQuery.current) return;
+    writtenQuery.current = query;
+    router.replace(`/projects/${id}${query ? `?${query}` : ''}`, { scroll: false });
+  }, [query, id, router]);
 
   const project = useProject(id);
   const tickets = useTickets(id, {
@@ -122,7 +118,7 @@ export default function ProjectPage() {
           </p>
         </div>
 
-        <TicketFilterBar value={filters} onChange={updateFilters} />
+        <TicketFilterBar value={filters} onChange={setFilters} />
 
         <div className="mt-4">
           {tickets.isError ? (
@@ -139,7 +135,7 @@ export default function ProjectPage() {
                 title="No tickets match these filters"
                 description="Try a different search term, or clear the filters to see every ticket."
                 action={
-                  <Button variant="secondary" onClick={() => updateFilters(EMPTY_FILTERS)}>
+                  <Button variant="secondary" onClick={() => setFilters(EMPTY_FILTERS)}>
                     Clear Filters
                   </Button>
                 }
