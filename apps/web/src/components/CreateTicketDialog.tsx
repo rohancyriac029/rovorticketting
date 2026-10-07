@@ -11,10 +11,10 @@ import { useCreateTicket } from '@/lib/hooks';
 import { ApiError } from '@/lib/apiFetch';
 import { submitOnModEnter } from '@/lib/forms';
 
+// No status here: the form doesn't offer one, so the API's default (Todo) applies.
 const DEFAULTS: TicketFormValues = {
   title: '',
   description: '',
-  status: 'TODO',
   priority: 'MEDIUM',
 };
 
@@ -60,10 +60,15 @@ export function CreateTicketDialog({
       open={open}
       onClose={close}
       title="New Ticket"
-      description={projectName ? `In ${projectName}` : undefined}
+      description={`${projectName ? `In ${projectName}. ` : ''}Starts as Todo.`}
     >
       <form onSubmit={handleSubmit(onSubmit)} onKeyDown={submitOnModEnter} className="space-y-4">
-        <TicketFields register={register} errors={errors} idPrefix={`new-ticket-${projectId}`} />
+        <TicketFields
+          register={register}
+          errors={errors}
+          idPrefix={`new-ticket-${projectId}`}
+          showStatus={false}
+        />
         <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
           <Button variant="ghost" onClick={close}>
             Cancel

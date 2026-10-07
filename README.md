@@ -107,6 +107,7 @@ See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the full AWS + Vercel walkthr
 ## 9. Assumptions, known limitations, incomplete functionality
 
 - No authentication, multi-tenancy, or permissions, per the assignment's explicit scope.
+- New tickets always start as **Todo**: the create dialog doesn't offer a status, and a ticket moves to In Progress or Done by editing it. (The API still accepts an optional `status` on create and defaults to `TODO`.)
 - Ticket search/filtering has no pagination; fine at the seeded scale, not production-scale.
 - Repo verification at project-creation time only checks the repo exists (a 404 is rejected); it doesn't re-validate on every ticket operation.
 - The GitHub-insights "one more useful metric" beyond stars/forks/open issues/last-updated is latest release tag + watcher count — shown together since either may be absent for a given repo.

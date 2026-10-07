@@ -16,17 +16,22 @@ export interface TicketFormValues {
   priority?: TicketPriority;
 }
 
-/** The four editable ticket fields, shared by the create dialog and the edit page. */
+/**
+ * The editable ticket fields, shared by the create dialog and the edit page. The create dialog
+ * hides Status: a new ticket always starts as Todo and only moves on when it is edited.
+ */
 export function TicketFields({
   register,
   errors,
   idPrefix,
   descriptionRows = 4,
+  showStatus = true,
 }: {
   register: UseFormRegister<TicketFormValues>;
   errors: FieldErrors<TicketFormValues>;
   idPrefix: string;
   descriptionRows?: number;
+  showStatus?: boolean;
 }) {
   return (
     <>
@@ -53,16 +58,18 @@ export function TicketFields({
           className="input resize-y"
         />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Status" htmlFor={`${idPrefix}-status`} error={errors.status?.message}>
-          <select {...register('status')} id={`${idPrefix}-status`} className="input">
-            {TICKET_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {TICKET_STATUS_LABELS[s]}
-              </option>
-            ))}
-          </select>
-        </Field>
+      <div className={showStatus ? 'grid grid-cols-2 gap-4' : undefined}>
+        {showStatus && (
+          <Field label="Status" htmlFor={`${idPrefix}-status`} error={errors.status?.message}>
+            <select {...register('status')} id={`${idPrefix}-status`} className="input">
+              {TICKET_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {TICKET_STATUS_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label="Priority" htmlFor={`${idPrefix}-priority`} error={errors.priority?.message}>
           <select {...register('priority')} id={`${idPrefix}-priority`} className="input">
             {TICKET_PRIORITIES.map((p) => (
